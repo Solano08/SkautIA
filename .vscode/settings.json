@@ -1,0 +1,12 @@
+{
+  "npm.autoDetect": "on",
+  "npm.exclude": "**/node_modules/**",
+  "npm.scriptExplorerAction": "run",
+  "files.exclude": {
+    "**/.next": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true
+  }
+}

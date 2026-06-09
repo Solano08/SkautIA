@@ -1,0 +1,12 @@
+{"sessionId":"12d1b2","hypothesisId":"D","location":"GlobeScene:mount","message":"Component mounted","data":{"theme":"dark"},"timestamp":1780072821479}
+{"sessionId":"12d1b2","hypothesisId":"D","location":"GlobeScene:mount","message":"Component mounted","data":{"theme":"dark"},"timestamp":1780072821481}
+{"sessionId":"12d1b2","hypothesisId":"A","location":"GlobeScene:onGlobeReady","message":"Globe ready","data":{"generation":1},"timestamp":1780072822031}
+{"sessionId":"12d1b2","hypothesisId":"A","location":"GlobeScene:scheduleAutoZoom","message":"Timer scheduled","data":{"delayMs":3000,"generation":1},"timestamp":1780072822033}
+{"sessionId":"12d1b2","hypothesisId":"A","location":"GlobeScene:setupGlobeControls","message":"Setup complete","data":{"generation":1,"globeRadius":100,"initialPov":{"lat":4.650000000000006,"lng":-73.5,"altitude":1.35}},"timestamp":1780072822034}
+{"sessionId":"12d1b2","hypothesisId":"C","location":"GlobeScene:runAutoZoom","message":"Auto zoom started","data":{"from":{"lat":4.65,"lng":-73.5,"altitude":1.35},"to":{"lat":4,"lng":-73,"altitude":0.11},"durationMs":3000},"timestamp":1780072825037}
+{"sessionId":"12d1b2","hypothesisId":"C","location":"GlobeScene:runAutoZoom","message":"Auto zoom completed","data":{"finalPov":{"lat":4,"lng":-73,"altitude":0.1100000000000001}},"timestamp":1780072828063}
+{"sessionId":"12d1b2","location":"GlobeScene.tsx:mount","message":"container size","data":{"w":806,"h":600},"hypothesisId":"H1","timestamp":1780074171908,"runId":"post-fix"}
+{"sessionId":"12d1b2","location":"GlobeScene.tsx:texture","message":"earth texture ok","data":{"url":"https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg"},"hypothesisId":"H4","timestamp":1780074172099,"runId":"post-fix"}
+{"sessionId":"12d1b2","location":"GlobeScene.tsx:ready","message":"globe ready","data":{"radius":100,"tileEngine":false,"dims":{"width":800,"height":600}},"hypothesisId":"H2","timestamp":1780074172178,"runId":"post-fix"}
+{"sessionId":"12d1b2","location":"GlobeScene.tsx:ready","message":"globe ready","data":{"radius":100,"tileEngine":false,"dims":{"width":806,"height":600}},"hypothesisId":"H2","timestamp":1780074172190,"runId":"post-fix"}
+{"sessionId":"12d1b2","location":"GlobeScene.tsx:ready","message":"globe ready","data":{"radius":100,"tileEngine":false,"dims":{"width":806,"height":600}},"hypothesisId":"H2","timestamp":1780074205309,"runId":"post-fix"}
