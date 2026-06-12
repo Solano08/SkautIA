@@ -1,13 +1,15 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import dynamic from "next/dynamic";
 import clsx from "clsx";
 import type { SectorMetric } from "@/types";
+
+// recharts pesa ~100 KB gzip: se carga después del primer render para no
+// bloquear el bundle crítico del dashboard (mapa incluido).
+const MetricSparkline = dynamic(
+  () => import("./MetricSparkline").then((mod) => mod.MetricSparkline),
+  { ssr: false, loading: () => null }
+);
 
 interface MetricCardProps {
   metric: SectorMetric;
@@ -70,18 +72,7 @@ export function MetricCard({ metric }: MetricCardProps) {
 
       {chartData && (
         <div className="h-12">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <Tooltip
-                contentStyle={{
-                  fontSize: 11,
-                  borderRadius: 8,
-                  border: "1px solid #e2e8f0",
-                }}
-              />
-              <Bar dataKey="value" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <MetricSparkline data={chartData} />
         </div>
       )}
 

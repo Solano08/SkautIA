@@ -23,6 +23,11 @@ export const SIDEBAR_ITEMS = [
   { id: "carteras" as const, label: "Carteras e Inversión", icon: "Wallet" },
 ];
 
+export const SIDEBAR_FOOTER_ITEMS = [
+  { id: "ajustes" as const, label: "Ajustes", icon: "Settings" },
+  { id: "ayuda" as const, label: "Ayuda", icon: "HelpCircle" },
+];
+
 export const VIEW_METRICS: Record<NavView, ViewMetrics> = {
   estrategia: {
     title: "Métricas Sectoriales",

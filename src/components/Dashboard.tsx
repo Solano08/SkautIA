@@ -10,14 +10,20 @@ import { RightPanel } from "@/components/layout/RightPanel";
 export function Dashboard() {
   const [activeView, setActiveView] = useState<NavView>("estrategia");
   const [activeSection, setActiveSection] = useState<SidebarSection>("datos");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+    <div className="relative flex h-screen w-screen overflow-hidden">
+      <Sidebar
+        activeSection={activeSection}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+        onSectionChange={setActiveSection}
+      />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col pl-[4.5rem]">
         <TopNav activeView={activeView} onViewChange={setActiveView} />
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <GlobePanel />
           <RightPanel activeView={activeView} />
         </div>

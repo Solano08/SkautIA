@@ -166,6 +166,8 @@ async function addDepartmentLabelLayer(map: mapboxgl.Map, theme: Theme) {
     map.addSource(SOURCE_DEPTS, {
       type: "geojson",
       data: labelPoints,
+      maxzoom: MAP_MAX_ZOOM,
+      buffer: 32,
     });
   }
 
@@ -212,6 +214,32 @@ export function updateDepartmentLabelTheme(map: mapboxgl.Map, theme: Theme) {
   if (map.getLayer(LAYER_COLOMBIA_BORDER)) {
     map.setPaintProperty(LAYER_COLOMBIA_BORDER, "line-color", palette.colombiaLine);
   }
+}
+
+/**
+ * Resuelve cuando el relleno gris de países extranjeros ya está cargado y
+ * pintado, para revelar el mapa sin el parpadeo a color (p. ej. EE. UU.).
+ */
+export function whenForeignCountriesReady(map: mapboxgl.Map): Promise<void> {
+  return new Promise((resolve) => {
+    const isReady = () =>
+      map.getLayer(LAYER_FOREIGN_FILL) != null &&
+      map.getSource(SOURCE_COUNTRIES) != null &&
+      map.isSourceLoaded(SOURCE_COUNTRIES);
+
+    if (isReady()) {
+      resolve();
+      return;
+    }
+
+    const onData = () => {
+      if (!isReady()) return;
+      map.off("sourcedata", onData);
+      resolve();
+    };
+
+    map.on("sourcedata", onData);
+  });
 }
 
 export type MapLayerMode = "world-gray" | "colombia-color";
@@ -283,19 +311,32 @@ export function setupColombiaOnlyLabelsWhenReady(
 
 /** Opciones compartidas para mapas más fluidos (menos trabajo por frame). */
 export const MAP_PERFORMANCE_OPTIONS = {
-  fadeDuration: 0,
+  // Fundido cruzado entre teselas: mantiene la textura anterior (con color)
+  // visible hasta que la nueva carga del todo. Evita el parpadeo a "blanco y
+  // negro" (relieve sin color) al hacer zoom rápido.
+  fadeDuration: 300,
   renderWorldCopies: false,
   antialias: false,
   maxPitch: 0,
   pitch: 0,
   bearing: 0,
-  prefetchZoomDelta: 4,
+  // Prefetch agresivo de teselas padre: al alejarse aparecen al instante.
+  prefetchZoomDelta: 5,
   refreshExpiredTiles: false,
+  // Solo usamos una fuente de etiquetas; evita el cálculo de colisiones cruzadas.
+  crossSourceCollisions: false,
+  // Caché de teselas grande y persistente: como la navegación está acotada a
+  // Colombia, al volver a un nivel de zoom las texturas ya están cargadas en
+  // memoria y no se vuelven a descargar ni a procesar.
+  minTileCacheSize: 256,
+  maxTileCacheSize: 1024,
 } as const;
 
+// Incluye el territorio insular del Pacífico y Caribe (Malpelo, San Andrés y
+// Providencia) con un pequeño margen, para no recortar lo que el usuario puede ver.
 export const COLOMBIA_MAX_BOUNDS: mapboxgl.LngLatBoundsLike = [
-  [-79.2, -4.35],
-  [-66.7, 13.0],
+  [-82.2, -4.6],
+  [-66.5, 13.7],
 ];
 
 export const MAP_MIN_ZOOM = 2.2;

@@ -61,7 +61,24 @@
   }
 
   .animate-ticker {
-    animation: ticker 20s linear infinite;
+    animation: ticker 35s linear infinite;
+    /* Promueve el ticker a su propia capa: la animación corre en el
+       compositor sin repintar la franja en cada frame. */
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-ticker {
+      animation: none;
+    }
+  }
+
+  /* Altura compartida: footer del sidebar y cinta de mercado quedan alineados. */
+  .market-ticker-bar {
+    display: flex;
+    height: 3.0625rem;
+    flex-shrink: 0;
+    align-items: center;
   }
 
   .mapbox-map-host .mapboxgl-map,
@@ -72,14 +89,114 @@
 
   .skaut-map-color .mapboxgl-canvas {
     filter: none;
+    /* El canvas llena el contenedor: durante el deslizamiento del sidebar la
+       imagen se estira (sin huecos) y solo reproyectamos al terminar. */
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Logo y atribución de Mapbox ocultos en la UI del dashboard. */
+  .skaut-map-color .mapboxgl-ctrl-logo,
+  .skaut-map-color .mapboxgl-ctrl-attrib {
+    display: none !important;
+  }
+
+  /* Efecto Liquid Glass (vidrio translúcido con brillo especular). */
+  .liquid-glass {
+    isolation: isolate;
+    overflow: hidden;
+    backdrop-filter: blur(24px) saturate(1.65) brightness(1.04);
+    -webkit-backdrop-filter: blur(24px) saturate(1.65) brightness(1.04);
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.58) 0%,
+      rgba(255, 255, 255, 0.24) 48%,
+      rgba(255, 255, 255, 0.38) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+      0 4px 24px rgba(15, 23, 42, 0.1),
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      inset 0 1px 1px rgba(255, 255, 255, 0.72),
+      inset 0 -0.5px 0 rgba(255, 255, 255, 0.28);
+  }
+
+  .liquid-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.1) 38%,
+      transparent 58%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .liquid-glass::after {
+    content: "";
+    position: absolute;
+    inset: -40% -20%;
+    background: radial-gradient(
+      ellipse 70% 45% at 18% -8%,
+      rgba(255, 255, 255, 0.42),
+      transparent 62%
+    );
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.85;
+  }
+
+  .liquid-glass > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .liquid-glass-dark {
+    backdrop-filter: blur(28px) saturate(1.55) brightness(0.94);
+    -webkit-backdrop-filter: blur(28px) saturate(1.55) brightness(0.94);
+    background: linear-gradient(
+      145deg,
+      rgba(15, 23, 42, 0.68) 0%,
+      rgba(30, 41, 59, 0.46) 50%,
+      rgba(15, 23, 42, 0.58) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .liquid-glass-dark::before {
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.04) 35%,
+      transparent 55%
+    );
+  }
+
+  .liquid-glass-dark::after {
+    background: radial-gradient(
+      ellipse 70% 45% at 20% -10%,
+      rgba(147, 197, 253, 0.12),
+      transparent 65%
+    );
+    opacity: 0.9;
   }
 }
 
+/* Cada copia de la cinta se desplaza su propio ancho completo: al terminar el
+   ciclo, la segunda copia ocupa exactamente la posición inicial de la primera. */
 @keyframes ticker {
   0% {
     transform: translateX(0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translateX(-100%);
   }
 }

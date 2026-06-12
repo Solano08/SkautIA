@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { Theme } from "@/context/ThemeContext";
-import type { MapViewState } from "./ColombiaMapboxOverlay";
 
 const ColombiaMapboxOverlay = dynamic(
   () =>
@@ -16,43 +15,35 @@ interface GridPlaneProps {
   theme: Theme;
 }
 
+/** Radio del glow que sigue al cursor (px). */
+const GLOW_RADIUS = 140;
+
 export function GridPlane({ theme }: GridPlaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [isHovering, setIsHovering] = useState(false);
-  const [mapView, setMapView] = useState<MapViewState>({
-    zoom: 2.28,
-    lng: -100,
-    lat: 45,
-  });
-
-  const resetMapRef = useRef<(() => void) | null>(null);
-
-  const handleMapViewChange = useCallback((view: MapViewState) => {
-    setMapView(view);
-  }, []);
-
-  const handleRegisterReset = useCallback((reset: () => void) => {
-    resetMapRef.current = reset;
-  }, []);
-
-  const handleResetView = useCallback(() => {
-    resetMapRef.current?.();
-  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    let rafId: number | null = null;
     const update = () => {
-      setSize({ width: el.clientWidth, height: el.clientHeight });
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        setSize({ width: el.clientWidth, height: el.clientHeight });
+      });
     };
 
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, []);
 
   const updateGlowPosition = useCallback((clientX: number, clientY: number) => {
@@ -61,9 +52,9 @@ export function GridPlane({ theme }: GridPlaneProps) {
     if (!el || !glow) return;
 
     const rect = el.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    glow.style.background = `radial-gradient(circle 140px at ${x}px ${y}px, var(--map-glow-inner), transparent 72%)`;
+    const x = clientX - rect.left - GLOW_RADIUS;
+    const y = clientY - rect.top - GLOW_RADIUS;
+    glow.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }, []);
 
   const handleMouseMove = useCallback(
@@ -87,72 +78,48 @@ export function GridPlane({ theme }: GridPlaneProps) {
 
   const hasSize = size.width > 0 && size.height > 0;
 
-  const hudClass = clsx(
-    "pointer-events-none absolute z-20 rounded-lg px-3 py-1.5 text-[10px] font-mono tabular-nums backdrop-blur-sm",
+  const glowFeather =
+    "radial-gradient(circle closest-side, black 30%, transparent 98%)";
+  const glowStyle: React.CSSProperties =
     theme === "dark"
-      ? "border border-white/10 bg-black/30 text-white/60"
-      : "border border-slate-200 bg-white/80 text-slate-500"
-  );
+      ? {
+          backdropFilter: "saturate(1.45) brightness(1.15)",
+          WebkitBackdropFilter: "saturate(1.45) brightness(1.15)",
+          maskImage: glowFeather,
+          WebkitMaskImage: glowFeather,
+          background:
+            "radial-gradient(circle closest-side, rgba(96,165,250,0.12), transparent 70%)",
+        }
+      : {
+          background:
+            "radial-gradient(circle closest-side, rgba(15,23,42,0.09), transparent 72%)",
+        };
 
   return (
     <div
       ref={containerRef}
       className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden bg-transparent"
-      style={{
-        ["--map-glow-inner" as string]:
-          theme === "dark" ? "rgba(0,0,0,0.45)" : "rgba(15,23,42,0.09)",
-      }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {hasSize && (
-        <ColombiaMapboxOverlay
-          theme={theme}
-          width={size.width}
-          height={size.height}
-          onViewChange={handleMapViewChange}
-          onRegisterReset={handleRegisterReset}
-        />
+        <ColombiaMapboxOverlay theme={theme} width={size.width} height={size.height} />
       )}
       <div
         ref={glowRef}
         aria-hidden
         className={clsx(
-          "pointer-events-none absolute inset-0 z-10 transition-opacity duration-200",
+          "pointer-events-none absolute left-0 top-0 z-10 rounded-full transition-opacity duration-200 will-change-transform",
           isHovering ? "opacity-100" : "opacity-0"
         )}
+        style={{
+          width: GLOW_RADIUS * 2,
+          height: GLOW_RADIUS * 2,
+          transform: "translate3d(-9999px, -9999px, 0)",
+          ...glowStyle,
+        }}
       />
-      <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 flex-col items-center gap-2">
-        <button
-          type="button"
-          onClick={handleResetView}
-          className={clsx(
-            "pointer-events-auto rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
-            theme === "dark"
-              ? "border border-white/15 bg-black/40 text-white/80 hover:bg-black/55"
-              : "border border-slate-200 bg-white/90 text-slate-600 shadow-sm hover:bg-white"
-          )}
-        >
-          Vista inicial
-        </button>
-        <div
-          className={clsx(
-            hudClass,
-            "flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-3 text-center"
-          )}
-        >
-          <span>
-            Zoom: {mapView.zoom.toFixed(2)}× · Lat: {mapView.lat.toFixed(2)} · Lng:{" "}
-            {mapView.lng.toFixed(2)}
-          </span>
-          <span className="hidden opacity-70 sm:inline">·</span>
-          <span className="hidden opacity-70 sm:inline">
-            Arrastra · Rueda ± · Botones +/−
-          </span>
-          <span className="opacity-70 sm:hidden">· Arrastra · Zoom</span>
-        </div>
-      </div>
     </div>
   );
 }

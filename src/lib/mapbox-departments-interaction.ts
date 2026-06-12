@@ -44,6 +44,8 @@ export async function addDepartmentBoundaryLayers(map: mapboxgl.Map, theme: Them
     type: "geojson",
     data: geojson,
     promoteId: "name_key",
+    // El mapa no supera z12 (MAP_MAX_ZOOM): evita teselado innecesario más fino.
+    maxzoom: 12,
   });
 
   map.addLayer({
@@ -105,13 +107,40 @@ export function bindDepartmentHover(
   onHover: (info: DepartmentHoverInfo | null) => void
 ): () => void {
   let hoveredKey: string | null = null;
+  let rafId: number | null = null;
+  let pending: DepartmentHoverInfo & { key: string } | null = null;
+
+  const setHoverState = (key: string, hover: boolean) => {
+    map.setFeatureState({ source: SOURCE_DEPT_POLYGONS, id: key }, { hover });
+  };
+
+  // Coalesce las actualizaciones de hover/tooltip a un único frame.
+  const flush = () => {
+    rafId = null;
+    if (!pending) return;
+    const { key, name, population, x, y } = pending;
+    pending = null;
+
+    if (hoveredKey !== key) {
+      if (hoveredKey) setHoverState(hoveredKey, false);
+      hoveredKey = key;
+      setHoverState(key, true);
+    }
+    onHover({ name, population, x, y });
+  };
+
+  const schedule = () => {
+    if (rafId == null) rafId = requestAnimationFrame(flush);
+  };
 
   const clearHover = () => {
+    pending = null;
+    if (rafId != null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     if (hoveredKey) {
-      map.setFeatureState(
-        { source: SOURCE_DEPT_POLYGONS, id: hoveredKey },
-        { hover: false }
-      );
+      setHoverState(hoveredKey, false);
       hoveredKey = null;
     }
     map.getCanvas().style.cursor = "";
@@ -131,24 +160,15 @@ export function bindDepartmentHover(
       return;
     }
 
-    if (hoveredKey !== key) {
-      if (hoveredKey) {
-        map.setFeatureState(
-          { source: SOURCE_DEPT_POLYGONS, id: hoveredKey },
-          { hover: false }
-        );
-      }
-      hoveredKey = key;
-      map.setFeatureState({ source: SOURCE_DEPT_POLYGONS, id: key }, { hover: true });
-    }
-
     map.getCanvas().style.cursor = "pointer";
-    onHover({
+    pending = {
+      key,
       name: String(feature.properties?.name ?? key),
       population: Number(feature.properties?.population ?? 0),
       x: event.point.x,
       y: event.point.y,
-    });
+    };
+    schedule();
   };
 
   map.on("mousemove", LAYER_DEPT_FILL, onMouseMove);

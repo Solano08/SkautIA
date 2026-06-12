@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type mapboxgl from "mapbox-gl";
 import type { Theme } from "@/context/ThemeContext";
@@ -8,6 +8,8 @@ import { formatPopulation } from "@/lib/colombia-departments-population";
 import type { DepartmentHoverInfo } from "@/lib/mapbox-departments-interaction";
 
 const REVEAL_TIMEOUT_MS = 12000;
+/** Máxima espera por el relleno gris de países antes de revelar igualmente. */
+const FOREIGN_FILL_MAX_WAIT_MS = 3000;
 
 export interface MapViewState {
   zoom: number;
@@ -45,10 +47,9 @@ function waitForContainerSize(container: HTMLDivElement) {
   });
 }
 
-export function ColombiaMapboxOverlay({
+function ColombiaMapboxOverlayInner({
   theme,
   width,
-  height,
   onViewChange,
   onRegisterReset,
 }: ColombiaMapboxOverlayProps) {
@@ -82,8 +83,12 @@ export function ColombiaMapboxOverlay({
     const generation = ++initGenerationRef.current;
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    let viewRaf: number | null = null;
+    let onMapMove: (() => void) | null = null;
     let revealTimeout: ReturnType<typeof setTimeout> | null = null;
     let introKickoffTimeout: ReturnType<typeof setTimeout> | null = null;
+    let foreignReadyTimeout: ReturnType<typeof setTimeout> | null = null;
     let cancelIntroFly: (() => void) | null = null;
     let layersSetupPromise: Promise<void> | null = null;
 
@@ -110,6 +115,12 @@ export function ColombiaMapboxOverlay({
 
     const init = async () => {
       try {
+        // Precalienta el GeoJSON departamental en paralelo con la carga de
+        // Mapbox: cuando toque añadir capas, los datos ya están en caché.
+        void import("@/lib/colombia-departments-population")
+          .then(({ loadColombiaDepartmentsGeoJSON }) => loadColombiaDepartmentsGeoJSON())
+          .catch(() => {});
+
         await waitForContainerSize(colorContainer);
         if (isStale()) return;
 
@@ -127,6 +138,7 @@ export function ColombiaMapboxOverlay({
           MAP_MIN_ZOOM,
           MAP_PERFORMANCE_OPTIONS,
           setupColombiaOnlyLabelsWhenReady,
+          whenForeignCountriesReady,
         } = mapboxLabels;
 
         const {
@@ -178,6 +190,18 @@ export function ColombiaMapboxOverlay({
         mapboxgl.workerUrl = "/mapbox-gl-csp-worker.js";
         mapboxgl.accessToken = token;
 
+        const cores =
+          typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 0;
+        if (cores) {
+          mapboxgl.workerCount = Math.min(Math.max(cores - 1, 2), 6);
+        }
+        mapboxgl.maxParallelImageRequests = 32;
+        try {
+          mapboxgl.prewarm();
+        } catch {
+          /* prewarm no disponible */
+        }
+
         setMapError(null);
         setMapReady(false);
         introStartedRef.current = false;
@@ -186,11 +210,13 @@ export function ColombiaMapboxOverlay({
           style: getColombiaTerrainStyle(),
           container: colorContainer,
           interactive: true,
-          attributionControl: true,
-          logoPosition: "bottom-right",
+          attributionControl: false,
           minZoom: MAP_MIN_ZOOM,
           maxZoom: MAP_MAX_ZOOM,
           projection: "globe",
+          // El redibujo por cambio de tama\u00f1o lo gestiona nuestro ResizeObserver
+          // (con throttle rAF); evitamos el listener de resize propio de Mapbox.
+          trackResize: false,
           ...MAP_PERFORMANCE_OPTIONS,
           preserveDrawingBuffer: false,
           center: MAP_CAMERA_INTRO_START.center,
@@ -204,10 +230,6 @@ export function ColombiaMapboxOverlay({
         mapColor.doubleClickZoom.disable();
         mapColor.touchZoomRotate.enable({ around: "center" });
         mapColor.boxZoom.enable();
-        mapColor.addControl(
-          new mapboxgl.NavigationControl({ showCompass: false }),
-          "top-right"
-        );
 
         mapColorRef.current = mapColor;
 
@@ -233,11 +255,32 @@ export function ColombiaMapboxOverlay({
             "colombia-color"
           );
 
-          scheduleIntroKickoff(mapColor);
+          // Revela el globo solo cuando el relleno gris de países ya está
+          // pintado, para que EE. UU. aparezca sin color desde el inicio
+          // (sin el parpadeo a color). Con tope de tiempo por seguridad.
+          let kickoffStarted = false;
+          const kickoff = () => {
+            if (kickoffStarted || isStale()) return;
+            kickoffStarted = true;
+            if (foreignReadyTimeout) {
+              clearTimeout(foreignReadyTimeout);
+              foreignReadyTimeout = null;
+            }
+            scheduleIntroKickoff(mapColor);
+          };
+
+          void whenForeignCountriesReady(mapColor).then(kickoff);
+          foreignReadyTimeout = setTimeout(kickoff, FOREIGN_FILL_MAX_WAIT_MS);
         });
 
-        mapColor.on("moveend", () => emitView(mapColor));
-        mapColor.on("zoomend", () => emitView(mapColor));
+        onMapMove = () => {
+          if (viewRaf !== null) return;
+          viewRaf = requestAnimationFrame(() => {
+            viewRaf = null;
+            if (!isStale()) emitView(mapColor);
+          });
+        };
+        mapColor.on("move", onMapMove);
 
         const resetView = () => {
           const mc = mapColorRef.current;
@@ -251,7 +294,13 @@ export function ColombiaMapboxOverlay({
 
         resizeObserver = new ResizeObserver(() => {
           if (isStale()) return;
-          mapColor.resize();
+          // Debounce: durante una transición (p. ej. el sidebar) el canvas se
+          // estira por CSS y solo reproyectamos una vez que el tamaño se asienta.
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            resizeTimer = null;
+            if (!isStale()) mapColor.resize();
+          }, 120);
         });
         resizeObserver.observe(host);
 
@@ -272,8 +321,14 @@ export function ColombiaMapboxOverlay({
       cancelled = true;
       if (revealTimeout) clearTimeout(revealTimeout);
       if (introKickoffTimeout) clearTimeout(introKickoffTimeout);
+      if (foreignReadyTimeout) clearTimeout(foreignReadyTimeout);
       cancelIntroFly?.();
       introStartedRef.current = false;
+      if (viewRaf !== null) cancelAnimationFrame(viewRaf);
+      if (onMapMove && mapColorRef.current) {
+        mapColorRef.current.off("move", onMapMove);
+      }
+      if (resizeTimer) clearTimeout(resizeTimer);
       resizeObserver?.disconnect();
       mapColorRef.current?.remove();
       mapColorRef.current = null;
@@ -293,12 +348,6 @@ export function ColombiaMapboxOverlay({
       applyGlobeAtmosphere(mapColor, theme);
     });
   }, [theme, mapReady]);
-
-  useEffect(() => {
-    const mapColor = mapColorRef.current;
-    if (!mapColor || !mapReady) return;
-    mapColor.resize();
-  }, [width, height, mapReady]);
 
   useEffect(() => {
     const mapColor = mapColorRef.current;
@@ -409,3 +458,5 @@ export function ColombiaMapboxOverlay({
     </div>
   );
 }
+
+export const ColombiaMapboxOverlay = memo(ColombiaMapboxOverlayInner);

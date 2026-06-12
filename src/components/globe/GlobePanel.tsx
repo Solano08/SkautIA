@@ -3,8 +3,6 @@
 import dynamic from "next/dynamic";
 import clsx from "clsx";
 import { useTheme } from "@/context/ThemeContext";
-import { COLOMBIA_CITIES, LIVE_FEED } from "@/lib/constants";
-import { LiveFeedCard } from "./LiveFeedCard";
 import { MarketTicker } from "./MarketTicker";
 
 const GridPlane = dynamic(
@@ -31,11 +29,8 @@ export function GlobePanel() {
     >
       <div className="relative min-h-0 flex-1">
         <GridPlane theme={theme} />
-        <div className="absolute bottom-10 left-4 z-10">
-          <LiveFeedCard feed={LIVE_FEED} />
-        </div>
       </div>
-      <MarketTicker cities={COLOMBIA_CITIES} />
+      <MarketTicker />
     </div>
   );
 }

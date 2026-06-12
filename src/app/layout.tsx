@@ -22,6 +22,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Adelanta el handshake TLS con Mapbox: estilo, teselas y telemetría. */}
+        <link rel="preconnect" href="https://api.mapbox.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://events.mapbox.com" />
+      </head>
       <body className={`${inter.variable} antialiased`}>
         <AppProviders>{children}</AppProviders>
       </body>

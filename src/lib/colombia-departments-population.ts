@@ -245,7 +245,9 @@ export async function loadColombiaDepartmentsGeoJSON(): Promise<
 > {
   if (cachedDepartments) return cachedDepartments;
 
-  const response = await fetch("/data/colombia-departments.geojson");
+  const response = await fetch("/data/colombia-departments.geojson", {
+    cache: "force-cache",
+  });
   if (!response.ok) {
     throw new Error("No se pudo cargar el mapa departamental de Colombia.");
   }
